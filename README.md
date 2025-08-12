@@ -41,7 +41,7 @@ Simply upload your interview videos, and InterviewAlly will generate transcripts
    ```bash
    git clone https://github.com/nkhanna94/InterviewAlly.git
    cd interviewally
-````
+   ```
 
 2. **Install dependencies**
 
