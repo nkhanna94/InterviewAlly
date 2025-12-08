@@ -1,92 +1,120 @@
-# InterviewAlly
+# 🚀 InterviewAlly
 
-**InterviewAlly** is an AI-powered interview analysis tool that helps candidates and HR professionals improve the interview process.  
-Simply upload your interview videos, and InterviewAlly will generate transcripts, run AI analysis, and give targeted feedback — powered by **VideoDB**, **Ollama**, and **RAG**.
+**Your Personal AI Interview Coach.**
+InterviewAlly is a local, privacy-first application that ingests interview recordings (video/audio), analyzes them using **RAG (Retrieval-Augmented Generation)**, and provides brutal, actionable feedback to help candidates get hired.
 
----
+Unlike generic chatbots, InterviewAlly uses **Speaker Diarization** to distinguish between the interviewer and candidate, and employs a **specialized RAG pipeline** to rewrite weak answers using the STAR method based on the candidate's actual experience.
 
-## 🚀 Features
+-----
 
-- **🎥 Video Upload & Processing**  
-  Upload interview recordings directly to the platform.
+## ⚡ Key Features
 
-- **📝 Automatic Transcription**  
-  Generates high-quality transcripts using **VideoDB**.
+  * **🎧 Multimodal Ingestion:** Upload `.mp4`, `.mov`, `.mp3`, or `.wav` files. The system uses **Faster-Whisper** for transcription and **Pyannote.audio** for Speaker Diarization (who said what).
+  * **🧠 RAG-Powered Analysis:**
+      * Indexes transcripts into **ChromaDB** using **Nomic Embeddings** (`nomic-embed-text-v1.5`).
+      * Preserves temporal metadata (timestamps) for precise context retrieval.
+  * **📊 Automated Scoring:** Uses **Llama 3.2** (via Ollama) to grade Technical Depth, Communication, and Cultural Fit on a 1-10 scale.
+  * **✨ Magic Rewriter:** Identifies weak answers and rewrites them into "Gold Standard" responses using the **STAR Method** (Situation, Task, Action, Result), grounded strictly in the transcript data (no hallucinations).
+  * **💬 Chat with your Interview:** A Q\&A interface to ask specific questions like *"Did I sound nervous?"* or *"How can I improve my explanation of SQL joins?"*
 
-- **🤖 AI-Powered Feedback**  
-  Get detailed analysis on communication skills, confidence, and clarity.
-
-- **🧠 RAG (Retrieval-Augmented Generation)**  
-  Uses contextual retrieval to provide feedback with evidence from the transcript.
-
-- **👥 Two Analysis Modes**
-  - **HR Mode:** Evaluate candidates, identify strengths & weaknesses.
-  - **Candidate Mode:** Get actionable tips to improve future interviews.
-
----
+-----
 
 ## 🛠️ Tech Stack
 
-- **Backend:** Python 
-- **AI Model:** [Ollama LLama 3](https://ollama.ai/) for LLM-based analysis  
-- **Transcription Engine:** [VideoDB](https://videodb.io/)  
-- **RAG Pipeline:** Custom embeddings & retrieval system for transcript-based Q&A  
-- **Frontend:** (React / Next.js / Streamlit — specify your choice)  
+  * **LLM & Orchestration:** [LangChain](https://www.langchain.com/), [Ollama](https://ollama.com/) (Llama 3.2), Pydantic (Structured Output).
+  * **Speech Processing:** [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper), [Pyannote.audio](https://github.com/pyannote/pyannote-audio).
+  * **Vector Database:** [ChromaDB](https://www.trychroma.com/) (Local persistence).
+  * **Backend:** FastAPI, SQLite (Job management), BackgroundTasks.
+  * **Frontend:** Streamlit.
 
----
+-----
 
-## 📦 Installation
+## 🏗️ Architecture
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/nkhanna94/InterviewAlly.git
-   cd interviewally
-````
+1.  **Ingestion:** Video is uploaded -\> Audio extracted -\> Transcribed (Whisper) -\> Speakers Identified (Pyannote).
+2.  **Indexing:** Transcript is split into **semantic chunks** (grouped by speaker turns & time) -\> Embedded -\> Stored in ChromaDB.
+3.  **Analysis:** Background task runs a "Coach" chain to generate a JSON report saved to SQLite.
+4.  **Interaction:** User views scores/feedback in Streamlit and triggers RAG-based rewrites or chat.
 
-2. **Install dependencies**
+-----
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+## 🚀 Setup & Installation
 
-3. **Configure environment variables**
-   Create a `.env` file with:
+### Prerequisites
 
-   ```env
-   VIDEODB_API_KEY=your_videodb_api_key
-   ```
+  * Python 3.10+
+  * [Ollama](https://ollama.com/) installed and running.
+  * **FFmpeg** installed (required for audio processing).
 
-4. **Run the app**
+### 1\. Clone the Repository
 
-   ```bash
-   streamlit run app.py
-   ```
+```bash
+git clone https://github.com/nkhanna94/InterviewAlly.git
+cd InterviewAlly
+```
 
----
+### 2\. Install Dependencies
 
-## 📄 Usage
+```bash
+pip install -r requirements.txt
+```
 
-1. Upload an interview video.
-2. Select **HR Mode** or **Candidate Mode**.
-3. Receive:
+### 3\. Setup Models
 
-   * AI-generated transcript
-   * Key highlights from the interview
-   * Strengths & areas for improvement
+**Pull the LLM:**
 
----
+```bash
+ollama pull llama3.2:latest
+```
 
-## 📅 Roadmap
+**Environment Variables:**
+Create a `.env` file in the root directory:
 
-* [ ] Multi-language support
-* [ ] Live interview feedback
-* [ ] Integration with ATS systems
+```env
+# Required for Pyannote Speaker Diarization
+HUGGINGFACEHUB_API_TOKEN=your_huggingface_token_here
+```
 
----
+### 4\. Run the Application
 
-## 🤝 Contributing
+You need to run the Backend and Frontend in separate terminals.
 
-Contributions are welcome!
-Fork the repo and submit a pull request with your improvements.
+**Terminal 1: Backend (FastAPI)**
 
----
+```bash
+uvicorn backend.main:app --reload
+```
+
+**Terminal 2: Frontend (Streamlit)**
+
+```bash
+streamlit run frontend/app.py
+```
+
+-----
+
+## 📂 Project Structure
+
+```
+InterviewAlly/
+├── backend/
+|   ├── chroma_db/           # Local Vector Store
+│   ├── main.py          # FastAPI endpoints & background tasks
+│   ├── brain.py         # LLM logic, Chains, & Structured Output
+│   ├── rag.py           # ChromaDB setup & Custom Chunking logic
+│   ├── transcripts.py   # Whisper + Pyannote pipeline
+│   └── jobs.db          # SQLite database for job status
+├── frontend/
+│   └── app.py           # Streamlit Dashboard
+└── requirements.txt
+```
+
+-----
+
+## 🔮 Future Improvements
+
+  * **LangGraph Integration:** Move from linear Chains to a stateful Agent for iterative critique/refinement of answers.
+  * **SQL Agent:** Allow users to query their history (e.g., *"Show me all interviews where I failed System Design"*).
+  * **Cloud Deployment:** Dockerize the application for AWS/GCP deployment.
+
+-----
