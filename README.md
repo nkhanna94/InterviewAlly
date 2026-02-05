@@ -2,7 +2,7 @@
 
 **Your Personal AI Interview Coach.**
 
-InterviewAlly is a **privacy-first, local RAG application** that helps candidates ace technical interviews. It ingests video/audio recordings, creates a structured transcript, and uses **Local LLMs (Phi-3.5 / Llama 3.2)** to provide brutal, actionable feedback.
+InterviewAlly is a **privacy-first, local RAG application** that helps candidates ace technical interviews. It ingests video/audio recordings, creates a structured transcript, and uses **Local LLMs (Phi-3.5)** to provide brutal, actionable feedback.
 
 Unlike generic tools that treat interviews as a blob of text, InterviewAlly uses **Speaker Diarization** and **Semantic Q&A Chunking** to understand the *structure* of the conversation, ensuring feedback is grounded in specific candidate answers.
 
@@ -32,7 +32,7 @@ Most RAG apps fail on interviews because they split text by word count (e.g., ev
 ### 4. 🔒 100% Local Privacy
 
 * Interviews contain sensitive career data. No data leaves the user's machine.
-* **Inference:** Ollama (Phi-3.5/Llama 3.2).
+* **Inference:** Ollama (Phi-3.5).
 * **Vector Store:** ChromaDB (Persisted locally).
 * **Transcription:** Faster-Whisper (On-device).
 
@@ -42,7 +42,7 @@ Most RAG apps fail on interviews because they split text by word count (e.g., ev
 
 | Component | Technology | Why? |
 | --- | --- | --- |
-| **LLM Inference** | [Ollama](https://ollama.com/) | Runs Phi-3.5/Llama 3.2 locally with zero latency penalty. |
+| **LLM Inference** | [Ollama](https://ollama.com/) | Runs Phi-3.5 locally with zero latency penalty. |
 | **Orchestration** | [LangChain](https://www.langchain.com/) | Manages retrieval chains and structured output parsing. |
 | **Speech-to-Text** | [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper) | 4x faster than standard Whisper using CTranslate2. |
 | **Diarization** | [Pyannote 3.1](https://github.com/pyannote/pyannote-audio) | SOTA speaker separation to distinguish "Interviewer" vs "Candidate." |
@@ -108,7 +108,7 @@ ollama pull phi3.5:latest
 Create a `.env` file in the root directory. **Crucial:** You must accept user conditions for `pyannote/speaker-diarization-3.1` on HuggingFace to get a token.
 
 ```env
-HUGGINGFACEHUB_API_TOKEN=hf_your_token_here
+HF_TOKEN=hf_your_token_here
 
 ```
 
@@ -129,6 +129,12 @@ uvicorn backend.main:app --reload
 streamlit run frontend/app.py
 
 ```
+
+### 5. Upload video
+
+The assets/ folder contains a few sample interview-style videos to make it easier to try the full workflow without recording your own session.
+
+These are included only for demonstration and evaluation purposes and are not part of the core product.
 
 ---
 
