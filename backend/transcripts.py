@@ -1,15 +1,15 @@
 import os
 from typing import Dict, Any, List
 from faster_whisper import WhisperModel
-from pyannote.audio import Pipeline
 import torch
 
 try:
-    from torch.torch_version import TorchVersion
-    torch.serialization.add_safe_globals([TorchVersion])
+    import pyannote.audio.core.task
+    torch.serialization.add_safe_globals([pyannote.audio.core.task.Specifications])
 except Exception as e:
-    print(f"Warning: Could not whitelist TorchVersion: {e}")
-# ----------------------------------------
+    print(f"⚠️ Could not patch PyTorch globals: {e}")
+
+from pyannote.audio import Pipeline
 
 # Configuration
 MODEL_SIZE = "base.en"
@@ -19,16 +19,15 @@ if torch.cuda.is_available():
     DIARIZATION_DEVICE = "cuda"
     COMPUTE_TYPE = "float16"
 elif torch.backends.mps.is_available():
-
     WHISPER_DEVICE = "cpu"    # CTranslate2 crashes on MPS, force CPU
     DIARIZATION_DEVICE = "mps" # Pyannote runs great on MPS
-    COMPUTE_TYPE = "int8"     # int8 is faster on CPU
+    COMPUTE_TYPE = "int8"
 else:
     WHISPER_DEVICE = "cpu"
     DIARIZATION_DEVICE = "cpu"
     COMPUTE_TYPE = "int8"
 
-HF_TOKEN = os.getenv("HF_TOKEN") 
+HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN") 
 
 class TranscriptGenerator:
     def __init__(self):
@@ -47,7 +46,7 @@ class TranscriptGenerator:
                 print(f"Error loading Pyannote: {e}")
                 self.diarization_pipeline = None
         else:
-            print("⚠️ No HF_TOKEN found. Diarization will be skipped.")
+            print("⚠️ No HUGGINGFACEHUB_API_TOKEN found. Diarization will be skipped.")
             self.diarization_pipeline = None
 
     def process_video_file(self, file_path: str) -> List[Dict[str, Any]]:

@@ -3,15 +3,18 @@ import re
 from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_ollama import ChatOllama
-from langchain_core.output_parsers import PydanticOutputParser, JsonOutputParser
+from langchain_core.output_parsers import JsonOutputParser
 from langchain_classic.chains.retrieval import create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 import traceback
 
 LLM_MODEL = ChatOllama(
-    model="llama3.2:latest", 
-    temperature=0.2,
-    keep_alive="5m"
+    model="phi3.5:latest", 
+    temperature=0.1,     # Lower temperature for precision
+    num_ctx=8192,
+    keep_alive="5m",
+    num_predict=500,    
+    repeat_penalty=1.1   # <--- PREVENT LOOPS
 )
 
 # --- 1. Structure (Pydantic) ---
@@ -32,7 +35,7 @@ class InterviewBrain:
     def _extract_json(self, text: str) -> str:
         """
         Robust cleaner: Finds the substring between the first { and last }.
-        This ignores any "Here is your JSON:" prefixes that Llama sometimes adds.
+        This ignores any "Here is your JSON:" prefixes that llm sometimes adds.
         """
         try:
             # 1. Strip whitespace
@@ -46,11 +49,24 @@ class InterviewBrain:
             return text
         except:
             return text
-
+        
     def generate_analysis(self, full_transcript_text: str) -> dict:
         parser = JsonOutputParser(pydantic_object=InterviewAnalysis)
         
-        # ONE-SHOT PROMPT: Explicit example prevents hallucinated schemas
+        # Check for empty transcript BEFORE sending to LLM
+        if not full_transcript_text or len(full_transcript_text) < 50:
+            print("❌ Error: Transcript is empty or too short!")
+            return {
+                "summary": "Error: The video transcription failed. Please check backend logs.",
+                "technical_score": 0,
+                "communication_score": 0,
+                "cultural_fit_score": 0,
+                "key_strengths": ["Error in Transcription"],
+                "critical_gaps": ["Please check server logs", "Pyannote might have failed"],
+                "timestamps_of_interest": []
+            }
+
+        # UPDATED PROMPT: Uses generic placeholders to prevent "Copying"
         prompt = PromptTemplate(
             template="""
             You are a **Skeptical, High-Standards Hiring Manager**. 
@@ -68,15 +84,15 @@ class InterviewBrain:
             2. Output ONLY a raw JSON object. Do NOT wrap it in markdown codes.
             3. Do NOT output the schema. Output the DATA.
 
-            **REQUIRED JSON FORMAT (Example):**
+            **REQUIRED JSON FORMAT:**
             {{
-                "summary": "Candidate struggled with basic SQL but showed good attitude...",
-                "technical_score": 4,
-                "communication_score": 7,
-                "cultural_fit_score": 6,
-                "key_strengths": ["Honesty", "Python Basics", "Enthusiasm"],
-                "critical_gaps": ["Did not know Joins", "Guessed on system design", "Vague answers"],
-                "timestamps_of_interest": ["00:05:30", "00:12:15"]
+                "summary": "Brief summary of candidate performance...",
+                "technical_score": 0,
+                "communication_score": 0,
+                "cultural_fit_score": 0,
+                "key_strengths": ["Strength 1", "Strength 2", "Strength 3"],
+                "critical_gaps": ["Gap 1", "Gap 2", "Gap 3"],
+                "timestamps_of_interest": ["00:00:00"]
             }}
             """,
             input_variables=["transcript"],
@@ -85,7 +101,7 @@ class InterviewBrain:
         chain = prompt | self.llm 
         
         try:
-            print("🧠 Sending transcript to Llama 3.1...")
+            print("🧠 Sending transcript to phi3.5 ...")
             # Get raw string response first
             raw_response = chain.invoke({"transcript": full_transcript_text[:25000]})
             
@@ -121,9 +137,9 @@ class InterviewBrain:
             f"{analysis_context}\n\n"
             
             "**INSTRUCTIONS:**\n"
-            "1. **Diagnosis:** Refer to the transcript context for evidence.\n"
-            "2. **Prescription:** Use your general knowledge to give study plans/advice.\n"
-            "3. **Style:** Be encouraging but specific."
+            "1. **Check Evidence:** Did the user mention this topic in the interview? If yes, critique their specific answer.\n"
+            "2. **If Evidence is Missing:** Explicitly state: 'You didn't cover this in the interview, but here is the general advice...'\n"
+            "3. **Be Concise:** No long bullet points. Keep it conversational and short (under 100 words)."
         )
 
         prompt = ChatPromptTemplate.from_messages(
@@ -140,50 +156,38 @@ class InterviewBrain:
         return response["answer"]
 
     def rewrite_answer(self, gap_description: str, transcript: str, profile_context: str) -> str:
-        """
-        Intelligent Rewriter: 
-        1. Finds the specific weak answer in the transcript.
-        2. Rewrites it using the STAR method (grounded in reality).
-        """
-        
-        # We use a specialized prompt that forces the AI to "Quote" the bad answer first
         prompt = PromptTemplate(
             template="""
-            You are an expert Interview Coach. 
+            TASK: Replace a weak interview answer with a short "Gold Standard" technical response (under 100 words).
             
-            **CANDIDATE PROFILE:**
-            {profile}
+            INPUTS:
+            - Candidate Profile: {profile}
+            - Critique: "{gap}"
+            - Transcript Segment: {transcript}
             
-            **CRITICISM TO FIX:**
-            "{gap}"
+            INSTRUCTIONS:
+            1. FIND the weak answer in the transcript matching the critique.
+            2. REWRITE it using the STAR method (Situation, Task, Action, Result).
+            3. CORRECT any technical errors (e.g., if they cite fake algorithms, use real ones like QuickSort/HashMap).
+            4. STOP immediately after the rewrite.
             
-            **TRANSCRIPT:**
-            {transcript}
+            STRICT OUTPUT FORMAT:
+            **Original Weak Answer:**
+            "[Exact quote from transcript]"
             
-            **TASK:**
-            1. **LOCATE:** Find the specific answer(s) in the transcript that triggered this criticism.
-            2. **REWRITE:** Rewrite that specific answer to be strong, professional, and detailed.
-            
-            **RULES FOR REWRITING:**
-            - **DO NOT HALLUCINATE:** Do not invent jobs or projects. Use the real details found in the transcript (e.g., if they said "Flutter login page", polish that specific task).
-            - **USE "STAR" METHOD:** (Situation, Task, Action, Result).
-            - **VOCABULARY:** Turn "I did a project" into "I spearheaded a prototype..." or "I implemented..."
-            - **TONE:** If the candidate is a student, keep it ambitious but realistic.
-            
-            **OUTPUT FORMAT:**
-            **Original Weak Answer:** "[Quote the specific part of the transcript]"
-            
-            **✨ Better Version:**
-            "[The polished, professional rewrite]"
+            **✨ Gold Standard Rewrite:**
+            "[The polished, technical answer using 'In my experience...' style]"
             """,
             input_variables=["gap", "transcript", "profile"],
         )
         
-        chain = prompt | self.llm
+        # Bind stop tokens to ensure it doesn't run forever
+        chain = prompt | self.llm 
         
+        # Reduced context to 10k chars for speed
         response = chain.invoke({
             "gap": gap_description, 
-            "transcript": transcript[:15000], 
+            "transcript": transcript[:25000], 
             "profile": profile_context
         })
         
